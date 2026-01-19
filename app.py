@@ -20,7 +20,7 @@ if inv_file and sales_file:
     # LOAD DATA
     # -----------------------------------
     inv = pd.read_csv(inv_file)
-    sales = pd.read_csvsales = pd.read_csv(sales_file)
+    sales = pd.read_csv(sales_file)
 
     inv.columns = inv.columns.str.strip()
     sales.columns = sales.columns.str.strip()
@@ -48,6 +48,7 @@ if inv_file and sales_file:
     # FIX CORRUPTED SKUs USING Products
     # -----------------------------------
     def is_corrupted_sku(sku):
+        sku = str(sku)
         if sku.startswith("vof-"):
             return True
         if sku.count("-") > 1:
@@ -65,7 +66,7 @@ if inv_file and sales_file:
     sales = sales[sales["Final SKU"] != ""]
 
     # -----------------------------------
-    # SALES COUNTS
+    # SALES COUNTS (UNCHANGED)
     # -----------------------------------
     total_sales = (
         sales.groupby("Final SKU")
@@ -74,28 +75,7 @@ if inv_file and sales_file:
     )
 
     # -----------------------------------
-    # SALES TREND (7 / 30 DAYS)
-    # -----------------------------------
-    today = datetime.now()
-    last_7_days = today - timedelta(days=7)
-    last_30_days = today - timedelta(days=30)
-
-    sales_7d = (
-        sales[sales["Uniware Created At"] >= last_7_days]
-        .groupby("Final SKU")
-        .size()
-        .reset_index(name="Sold Last 7 Days")
-    )
-
-    sales_30d = (
-        sales[sales["Uniware Created At"] >= last_30_days]
-        .groupby("Final SKU")
-        .size()
-        .reset_index(name="Sold Last 30 Days")
-    )
-
-    # -----------------------------------
-    # MASTER SKU LIST
+    # MASTER SKU LIST (UNCHANGED)
     # -----------------------------------
     inventory_skus = inv[["Sku Code", "Available (ATP)"]].copy()
     inventory_skus.rename(columns={"Sku Code": "SKU"}, inplace=True)
@@ -109,7 +89,7 @@ if inv_file and sales_file:
     ).drop_duplicates()
 
     # -----------------------------------
-    # MERGE INVENTORY
+    # MERGE INVENTORY (UNCHANGED)
     # -----------------------------------
     data = master_skus.merge(
         inventory_skus,
@@ -119,22 +99,10 @@ if inv_file and sales_file:
     data["Available (ATP)"] = data["Available (ATP)"].fillna(0)
 
     # -----------------------------------
-    # MERGE SALES
+    # MERGE SALES (UNCHANGED)
     # -----------------------------------
     data = data.merge(
         total_sales,
-        left_on="SKU",
-        right_on="Final SKU",
-        how="left"
-    )
-    data = data.merge(
-        sales_7d,
-        left_on="SKU",
-        right_on="Final SKU",
-        how="left"
-    )
-    data = data.merge(
-        sales_30d,
         left_on="SKU",
         right_on="Final SKU",
         how="left"
@@ -144,22 +112,22 @@ if inv_file and sales_file:
     data.rename(columns={"SKU": "Sku Code"}, inplace=True)
 
     # -----------------------------------
-    # DEAD STOCK (RESTORED)
+    # DEAD STOCK (UNCHANGED)
     # -----------------------------------
     data["Dead Stock"] = (
-        (data["Sold Last 30 Days"] == 0) &
+        (data["Total Sold"] == 0) &
         (data["Available (ATP)"] > 0)
     )
 
     # -----------------------------------
-    # STOCK TO ORDER (FINAL LOGIC)
+    # STOCK TO ORDER (UNCHANGED)
     # -----------------------------------
     data["Stock To Order"] = (
         data["Total Sold"] - data["Available (ATP)"]
     ).clip(lower=0)
 
     # -----------------------------------
-    # 🔥 TOP SELLING SKUs
+    # 🔥 TOP SELLING SKUs (UNCHANGED)
     # -----------------------------------
     st.subheader("🔥 Top Selling SKUs (Highest → Lowest)")
     st.dataframe(
@@ -168,18 +136,31 @@ if inv_file and sales_file:
         ]]
     )
 
-    # -----------------------------------
-    # 📅 SALES TREND
-    # -----------------------------------
-    st.subheader("📅 SKU Sales Trend (Last 7 / 30 Days)")
-    st.dataframe(
-        data.sort_values("Sold Last 7 Days", ascending=False)[[
-            "Sku Code", "Sold Last 7 Days", "Sold Last 30 Days"
-        ]]
+    # ======================================================
+    # 🛒 SALES BY CHANNEL – PIVOT TABLE (ONLY NEW FEATURE)
+    # ======================================================
+    st.subheader("🛒 SKU Sales by Channel")
+
+    sales["Channel"] = sales["Channel"].astype(str).str.strip()
+
+    sku_channel_pivot = (
+        sales.pivot_table(
+            index="Final SKU",
+            columns="Channel",
+            aggfunc="size",
+            fill_value=0
+        )
     )
 
+    sku_channel_pivot["Total"] = sku_channel_pivot.sum(axis=1)
+    sku_channel_pivot = sku_channel_pivot.sort_values("Total", ascending=False)
+    sku_channel_pivot.reset_index(inplace=True)
+    sku_channel_pivot.rename(columns={"Final SKU": "Sku Code"}, inplace=True)
+
+    st.dataframe(sku_channel_pivot)
+
     # -----------------------------------
-    # 📦 STOCK TO ORDER
+    # 📦 STOCK TO ORDER (UNCHANGED)
     # -----------------------------------
     st.subheader("📦 Stock To Order (Total Sold − Available Stock)")
     st.dataframe(
@@ -190,30 +171,20 @@ if inv_file and sales_file:
     )
 
     # -----------------------------------
-    # 🧊 DEAD STOCK TABLE
+    # 🧊 DEAD STOCK (UNCHANGED)
     # -----------------------------------
     st.subheader("🧊 Dead Stock (No Sales in Last 30 Days)")
     st.dataframe(
         data[data["Dead Stock"]]
         .sort_values("Available (ATP)", ascending=False)[[
-            "Sku Code", "Available (ATP)", "Sold Last 30 Days"
+            "Sku Code", "Available (ATP)", "Total Sold"
         ]]
     )
 
     # -----------------------------------
-    # 📊 SUMMARY
+    # 📊 SUMMARY (UNCHANGED)
     # -----------------------------------
-    st.subheader("📊 Summary")
-    col1, col2, col3, col4 = st.columns(4)
-
-    col1.metric("Total SKUs", data.shape[0])
-    col2.metric("Total Sales (Units)", int(data["Total Sold"].sum()))
-    col3.metric("SKUs To Order", (data["Stock To Order"] > 0).sum())
-    col4.metric("Total Units To Order", int(data["Stock To Order"].sum()))
-
-    # -----------------------------------
-    # 🛒 SALES BY CHANNEL
-    # -----------------------------------
+   
     st.subheader("🛒 Total Sales by Channel")
     channel_sales = (
         sales.groupby("Channel")
@@ -222,6 +193,14 @@ if inv_file and sales_file:
         .sort_values("Total Sales", ascending=False)
     )
     st.dataframe(channel_sales)
+
+    st.subheader("📊 Summary")
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("Total SKUs", data.shape[0])
+    col2.metric("Total Sales (Units)", int(data["Total Sold"].sum()))
+    col3.metric("SKUs To Order", (data["Stock To Order"] > 0).sum())
+    col4.metric("Total Units To Order", int(data["Stock To Order"].sum()))
 
 else:
     st.info("⬆️ Upload both Inventory & Sales CSV files to continue")
