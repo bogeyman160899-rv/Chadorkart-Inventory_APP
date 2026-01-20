@@ -6,13 +6,13 @@ from datetime import datetime, timedelta
 # PAGE SETUP
 # -----------------------------------
 st.set_page_config(page_title="Chadorkart Inventory", layout="wide")
-st.title("📦 Chadorkart Inventory – Complete Inventory Dashboard")
+st.title("📦 The Inventory – Complete Inventory Dashboard For Chadorkart")
 
 # -----------------------------------
 # FILE UPLOAD
 # -----------------------------------
-inv_file = st.file_uploader("Upload INVENTORY CSV", type=["csv"])
-sales_file = st.file_uploader("Upload SALES / ORDERS CSV", type=["csv"])
+inv_file = st.file_uploader("Upload UNIWARE INVENTORY CSV", type=["csv"])
+sales_file = st.file_uploader("Upload UNIWARE SALES / ORDERS CSV", type=["csv"])
 
 if inv_file and sales_file:
 
