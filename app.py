@@ -193,14 +193,24 @@ if inv_file and sales_file:
         .sort_values("Total Sales", ascending=False)
     )
     st.dataframe(channel_sales)
-
+    
     st.subheader("📊 Summary")
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
 
-    col1.metric("Total SKUs", data.shape[0])
-    col2.metric("Total Sales (Units)", int(data["Total Sold"].sum()))
-    col3.metric("SKUs To Order", (data["Stock To Order"] > 0).sum())
-    col4.metric("Total Units To Order", int(data["Stock To Order"].sum()))
+    col1.metric(
+        "Total Sale Units",
+        int(data["Total Sold"].sum())
+    )
+
+    col2.metric(
+        "Total Stock To Order Units",
+        int(data["Stock To Order"].sum())
+    )
+
+    col3.metric(
+        "Total Inventory Units",
+        int(data["Available (ATP)"].sum())
+    )
 
 else:
     st.info("⬆️ Upload both Inventory & Sales CSV files to continue")
