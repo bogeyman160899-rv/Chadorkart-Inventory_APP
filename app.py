@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 # PAGE SETUP
 # -----------------------------------
 st.set_page_config(page_title="Chadorkart Inventory", layout="wide")
-st.title("📦 The Inventory – Complete Inventory Dashboard For Chadorkart")
+st.title("📦 The Inventory – Complete Sale & Inventory Dashboard For Chadorkart")
 
 # -----------------------------------
 # FILE UPLOAD
